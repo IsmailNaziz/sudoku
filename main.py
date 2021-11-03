@@ -4,7 +4,7 @@ from random import choice
 from time import sleep
 import os
 from math import sqrt
-
+import gc
 
 class GridManager(object):
 	"""docstring for GameManager"""
@@ -18,6 +18,83 @@ class GridManager(object):
 		self.boxes = self._generate_boxes() # key index of the box : value points in the box
 		self.ref = set([str(i) for i in range(1,self.size+1)])
 		self.valid = True
+		self.grid_possibilities = self._init_grid_possibilities()
+
+	def _init_grid(self):
+		return [[' ' for i in range(self.size)] for j in range(self.size)]
+
+	def _reset_grid(self):
+		self.grid = self._init_grid()
+
+
+	def _init_grid_possibilities(self):
+		return [[set([str(i) for i in range(1,self.size+1)])\
+		 			for i in range(self.size)] for j in range(self.size)]
+
+
+	def _fill_grid_constraint_heuristic_max_possibilities(self):
+		nb_rows, nb_cols = len(self.grid), len(self.grid[0])
+		for row_i in range(nb_rows):
+			for col_j in range(nb_cols):
+				actual_index = (row_i, col_j)
+				self.update_grid_possibilities(actual_index)
+
+
+
+	def update_grid_possibilities(self, actual_index):
+
+		actual_possibilities = self.get_set_from_index_Gpossiblities(actual_index)
+		best_choice = self.get_best_choice(actual_possibilities)
+		self.grid = self.propagate_choice(actual_index, best_choice, self.grid)
+
+		# self.pick_random_from_set(this_set)
+		return
+
+	def get_best_choice(self, actual_index, actual_possibilities):
+		''' Calculate possibility without alteration of initial grid
+		return best choice for the grid'''
+		new_grid = copy.deepcopy(self.grid_possibilities)
+		# s'eneklever le point lui meme
+		# init
+		multiple_best_choices = []
+		best_choice = actual_possibilities[0]
+		max_possibilities = \
+		self.calculate_nb_possibilities(self.propagate_choice(actual_index, actual_possibilities[0], new_grid))
+
+		for possibility in actual_possibilities:
+			new_grid = copy.deepcopy(self.grid_possibilities)
+			updated_grid = self.propagate_choice(actual_index, actual_possibilities[0], new_grid)
+			nb_possibilities = self.calculate_nb_possibilities(new_grid)
+			if nb_possibilities > max_possibilities:
+				best_choice = possibility
+				nb_possibilities = max_possibilities
+			elif nb_possibilities == max_possibilities:
+				multiple_best_choices.append(possibility)
+			del new_grid
+			gc.collect()
+
+
+
+		return best_choice
+
+	
+	def propagate_choice(self, actual_index, choice, grid):
+		grid[actual_index[0]][actual_index[1]] = choice
+		actual_box = self.get_box(actual_index)
+		actual_column = [(actual_index[0], i) for i in range(len(grid))]
+		actual_row= [(i, actual_index[1]) for i in range(len(grid))]
+		for index in actual_box+actual_column+actual_row:
+			grid[index[0]][index[1]] = grid[index[0]][index[1]]-{choice}
+		return grid
+
+	def calculate_nb_possibilities(self, grid):
+		counter = 0
+		nb_rows, nb_cols = len(grid), len(grid[0])
+		for row_i in range(nb_rows):
+			for col_j in range(nb_cols):
+				this_index = (row_i, col_j)
+				counter += len(self.get_set_from_index(this_index, grid))
+		return counter
 
 
 	def _generate_boxes(self):
@@ -126,12 +203,6 @@ class GridManager(object):
 		return choice(tuple(this_set))
 		 
 
-	def _init_grid(self):
-		return[[' ' for i in range(self.size)] for j in range(self.size)]
-
-	def _reset_grid(self):
-		self.grid = self._init_grid()
-
 
 	def get_availabilities(self, actual_index):
 		list_sets = [self._get_row_availability(actual_index),
@@ -179,6 +250,9 @@ class GridManager(object):
 			if actual_index in indexes: 
 				return box
 
+	def get_set_from_index(self, index, possibility_grid):
+		return possibility_grid[index[0]][index[1]]
+
 	def get_values_from_index(self, index):
 		return self.grid[index[0]][index[1]]
 
@@ -221,7 +295,9 @@ if __name__ == '__main__':
 						.format(method_name, round((nb_success/total_attempt)*100,2), size_x, size_y))
 
 	evaluate = False
-	display = True
+	display = False
+	contraint_check = True 
+
 	if display:
 		size_x, size_y = 4, 4
 		GM = GridManager()
@@ -230,6 +306,7 @@ if __name__ == '__main__':
 		GM._fill_grid_line_by_line(display_mode=True)
 		GM._reset_grid()
 		GM._fill_grid_box_by_box(display_mode=True)
+
 	if evaluate:
 		method_list = ['_fill_grid_snail', '_fill_grid_line_by_line', '_fill_grid_box_by_box']
 		test_1 = (4, 4, 1000, *method_list)
@@ -237,3 +314,7 @@ if __name__ == '__main__':
 
 		success_rate(*test_1)
 		success_rate(*test_2)
+
+	if contraint_check:
+		GM = GridManager()
+		print(GM.constraints)
