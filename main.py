@@ -1,24 +1,29 @@
-from itertools import product, chain
+from itertools import product
 import copy
 from random import choice
 from time import sleep
+import os
+from math import sqrt
+
 
 class GridManager(object):
 	"""docstring for GameManager"""
 
-	REF = set([str(i) for i in range(1,10)])
+	
 
 	def __init__(self, size_x=9, size_y=9):
 		self.grid = self._init_grid(size_x, size_y)
-		self.box_size = 3 # edge of the square
+		self.box_size = int(sqrt(size_x)) # edge of the square
 		self.boxes = self._generate_boxes() # key index of the box : value points in the box
+		self.ref = set([str(i) for i in range(1,size_x+1)])
 
 
 	def _generate_boxes(self):
 		boxes = {}
-		for num in range(self.box_size**2):
-			translate_i, translate_j = num//3*3, num%3*3
-			boxes[str(num)] = [(i + translate_i, j + translate_j) for i,j in product(range(3), range(3))]
+		size = self.box_size
+		for num in range(size**2):
+			translate_i, translate_j = num//size*size, num%size*size
+			boxes[str(num)] = [(i + translate_i, j + translate_j) for i,j in product(range(size), range(size))]
 		return boxes
 
 	def print_check_boxes(self):
@@ -70,16 +75,29 @@ class GridManager(object):
 		min_i, max_i = 0, nb_rows-1
 		min_j, max_j = 0, nb_cols-1
 
-		while max_i >= min_i and max_j >= min_j: # one condition is enough
-			self.snail_browse(min_i, max_i, min_i, max_i, display_mode)
-			max_i -= 1
-			max_j -= 1
-			min_i += 1
-			max_i += 1
+		if nb_rows%2==0:
+			while max_i >= min_i+1 and max_j >= min_j+1: # one condition is enough
+				self.snail_browse(min_i, max_i, min_i, max_i, display_mode)
+				max_i -= 1
+				max_j -= 1
+				min_i += 1
+				min_j += 1
+		else:
+			middle_index = nb_rows//2, nb_cols//2
+			while max_i >= min_i+1 and max_j >= min_j+1: # one condition is enough
+				self.snail_browse(min_i, max_i, min_i, max_i, display_mode)
+				max_i -= 1
+				max_j -= 1
+				min_i += 1
+				min_j += 1
+			self.replace_with_random_available_value(middle_index)
+			if display_mode:
+				self.slow_display()
 			
 	def slow_display(self):
 		print(self)
 		sleep(0.2)
+		os.system('cls||clear')
 
 	def replace_with_random_available_value(self, actual_index):
 		random_value = self.pick_random_from_set(self.get_availabilities(actual_index))
@@ -98,15 +116,30 @@ class GridManager(object):
 		list_sets = [self._get_row_availability(actual_index),
 					 self._get_col_availability(actual_index),
 					 self._get_box_availability(actual_index)]
-		return set(chain(*list_sets))
+		return set.intersection(*list_sets)
 
+	@classmethod
+	def debug_print(cls, iter_to_display):
+		print("------------------------------------------------------")
+		print("------------------------------------------------------")
+		for elem in iter_to_display:
+			if isinstance(elem, list):
+				for sub_elem in elem:
+					print(sub_elem)
+					print("------------------------------------------------------")
+					print("------------------------------------------------------")
+			else:
+				print(elem)
+				print("------------------------------------------------------")
+				print("------------------------------------------------------")
+	 
 	def _get_row_availability(self, actual_index):
-		row_indexes = [(i, actual_index[1]) for i in range(9)]
+		row_indexes = [(i, actual_index[1]) for i in range(len(self.grid))]
 		not_available_values = self.get_values_from_indexes(row_indexes)
 		return self._complementary_set(not_available_values) 
 
 	def _get_col_availability(self, actual_index):
-		column_indexes = [(actual_index[0], i) for i in range(9)]
+		column_indexes = [(actual_index[0], i) for i in range(len(self.grid))]
 		not_available_values = self.get_values_from_indexes(column_indexes)
 		return self._complementary_set(not_available_values) 
 
@@ -129,9 +162,8 @@ class GridManager(object):
 	def replace_index_value(self, index, value):
 		self.grid[index[0]][index[1]] = value
 
-	@classmethod
-	def _complementary_set(cls, this_set):
-		return cls.REF - this_set
+	def _complementary_set(self, this_set):
+		return self.ref - this_set
 
 	def __str__(self):
 		rows_display = ['|'.join(row) for row in self.grid]
@@ -142,5 +174,24 @@ class GridManager(object):
 
 
 if __name__ == '__main__':
-	GM = GridManager()
-	GM._fill_grid(display_mode=True)
+
+
+	def success_rate(size_x, size_y, total_attempt):
+		nb_success, nb_fail = 0, 0
+		for i in range(total_attempt):
+			GM = GridManager(size_x, size_y)
+			try:
+				nb_success+=1
+				GM._fill_grid()
+				print(GM)
+			except IndexError:
+				nb_success-=1
+				nb_fail+=1
+
+		print(r'% de reussite {}'.format(round((nb_success/total_attempt)*100,2)))
+
+	test_1 = (4, 4, 1000)
+	test_2 = (9, 9, 1000)
+
+	success_rate(*test_1)
+	success_rate(*test_2)
