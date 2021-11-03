@@ -1,14 +1,16 @@
-class Test(object):
+class C:
 
-	def __init__(self):
-		self.count = 0
+    def m(self):
 
-	def add(self):
-		print(count)
-		self.count +=1
+        return "result"
 
 
-L = list(range(10))
-test = Test()
-map(test.add, L)
-print(test.count)
+an_object = C()
+
+
+class_method = getattr(C, "m")
+
+result = class_method(an_object)
+
+
+print(result)

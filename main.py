@@ -12,10 +12,12 @@ class GridManager(object):
 	
 
 	def __init__(self, size_x=9, size_y=9):
-		self.grid = self._init_grid(size_x, size_y)
-		self.box_size = int(sqrt(size_x)) # edge of the square
+		self.size = size_x
+		self.box_size = int(sqrt(self.size)) # edge of the square
+		self.grid = self._init_grid()
 		self.boxes = self._generate_boxes() # key index of the box : value points in the box
-		self.ref = set([str(i) for i in range(1,size_x+1)])
+		self.ref = set([str(i) for i in range(1,self.size+1)])
+		self.valid = True
 
 
 	def _generate_boxes(self):
@@ -68,7 +70,7 @@ class GridManager(object):
 			if display_mode:
 				self.slow_display()
 
-	def _fill_grid(self, display_mode=False):
+	def _fill_grid_snail(self, display_mode=False):
 		# init
 		nb_rows, nb_cols = len(self.grid), len(self.grid[0])		
 		row_i, col_j = 0, 0
@@ -93,7 +95,23 @@ class GridManager(object):
 			self.replace_with_random_available_value(middle_index)
 			if display_mode:
 				self.slow_display()
-			
+	
+	def _fill_grid_line_by_line(self, display_mode=False):
+		nb_rows, nb_cols = len(self.grid), len(self.grid[0])
+		for row_i in range(nb_rows):
+			for col_j in range(nb_cols):
+				self.replace_with_random_available_value((row_i, col_j))
+				if display_mode:
+						self.slow_display()
+
+	def _fill_grid_box_by_box(self, display_mode=False):
+		for box, indexes in self.boxes.items():
+			for index in indexes:
+				self.replace_with_random_available_value(index)
+				if display_mode:
+						self.slow_display()
+
+
 	def slow_display(self):
 		print(self)
 		sleep(0.2)
@@ -108,15 +126,23 @@ class GridManager(object):
 		return choice(tuple(this_set))
 		 
 
-	def _init_grid(self, size_x, size_y):
-		return[[' ' for i in range(size_y)] for j in range(size_x)]
+	def _init_grid(self):
+		return[[' ' for i in range(self.size)] for j in range(self.size)]
+
+	def _reset_grid(self):
+		self.grid = self._init_grid()
 
 
 	def get_availabilities(self, actual_index):
 		list_sets = [self._get_row_availability(actual_index),
 					 self._get_col_availability(actual_index),
 					 self._get_box_availability(actual_index)]
-		return set.intersection(*list_sets)
+		if set.intersection(*list_sets):
+			return set.intersection(*list_sets)
+
+		else: 
+			self.valid = False
+			return {'E'}
 
 	@classmethod
 	def debug_print(cls, iter_to_display):
@@ -176,22 +202,38 @@ class GridManager(object):
 if __name__ == '__main__':
 
 
-	def success_rate(size_x, size_y, total_attempt):
-		nb_success, nb_fail = 0, 0
-		for i in range(total_attempt):
-			GM = GridManager(size_x, size_y)
-			try:
-				nb_success+=1
-				GM._fill_grid()
-				print(GM)
-			except IndexError:
-				nb_success-=1
-				nb_fail+=1
+	def success_rate(size_x, size_y, total_attempt, *args):
+		if len(args) == 0:
+			return 'no method to evaluate'
 
-		print(r'% de reussite {}'.format(round((nb_success/total_attempt)*100,2)))
+		if len(args)>1:
+			for method_name in args:
+				nb_success, nb_fail = 0, 0
+				for i in range(total_attempt):
+					GM = GridManager(size_x, size_y)
+					method_to_evaluate = getattr(GridManager, method_name)
+					method_to_evaluate(GM)
+					if GM.valid:
+						nb_success+=1
+					else:
+						nb_fail+=1
+				print(r'le % de reussite de {} est de {}% pour une matrice de taille {}x{}'\
+						.format(method_name, round((nb_success/total_attempt)*100,2), size_x, size_y))
 
-	test_1 = (4, 4, 1000)
-	test_2 = (9, 9, 1000)
+	evaluate = False
+	display = True
+	if display:
+		size_x, size_y = 4, 4
+		GM = GridManager()
+		GM._fill_grid_snail(display_mode=True)
+		GM._reset_grid()
+		GM._fill_grid_line_by_line(display_mode=True)
+		GM._reset_grid()
+		GM._fill_grid_box_by_box(display_mode=True)
+	if evaluate:
+		method_list = ['_fill_grid_snail', '_fill_grid_line_by_line', '_fill_grid_box_by_box']
+		test_1 = (4, 4, 1000, *method_list)
+		test_2 = (9, 9, 1000, *method_list)
 
-	success_rate(*test_1)
-	success_rate(*test_2)
+		success_rate(*test_1)
+		success_rate(*test_2)
